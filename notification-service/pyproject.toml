@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "notification-service"
+version = "0.1.0"
+description = ""
+authors = ["hamzah-syed <hamzah.syed17@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+aiokafka = "^0.11.0"
+fastapi = "^0.111.1"
+uvicorn = "^0.30.3"
+kafka-python = "^2.0.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

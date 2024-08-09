@@ -1,0 +1,133 @@
+version: '3.7'
+
+services:
+  kafka:
+    image: bitnami/kafka:latest
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@localhost:19092
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:19092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LOG_DIRS=/bitnami/kafka/data
+      - KAFKA_BROKER_ID=1
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/bitnami/kafka/data
+    networks:
+      - app-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - app-network
+
+  inventory-db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: inventory
+    ports:
+      - "5432:5432"
+    volumes:
+      - inventory_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-db:
+    image: postgres:13
+    container_name: user-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: users
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  inventory-service:
+    # image: hamzahrpc/inventory-service:latest
+    container_name: inventory-service
+    build:
+      context: ./inventory-service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka
+      - inventory-db
+    env_file:
+      - .env.common
+      - ./inventory-service/${ENV_FILE}
+    volumes:
+      - ./inventory-service:/app
+    networks:
+      - app-network
+
+  user-service:
+    # image: hamzahrpc/user-service:latest
+    container_name: user-service
+    build:
+      context: ./user-service
+    ports:
+      - "8001:8000"
+    depends_on:
+      - kafka
+      - user-db
+    env_file:
+      - .env.common
+      - ./user-service/.env
+    volumes:
+      - ./user-service:/app
+    networks:
+      - app-network
+
+  notification-service:
+    # image: hamzahrpc/notification-service:latest
+    container_name: notification-service
+    build:
+      context: ./notification-service
+    ports:
+      - "8002:8000"
+    depends_on:
+      - kafka
+    env_file:
+      - .env.common
+      - ./notification-service/.env
+    volumes:
+      - ./notification-service:/app
+    networks:
+      - app-network
+
+volumes:
+  kafka_data:
+  inventory_data:
+  user_data:
+
+networks:
+  app-network:
+    driver: bridge

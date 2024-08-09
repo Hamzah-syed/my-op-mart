@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "user-service"
+version = "0.1.0"
+description = ""
+authors = ["hamzah-syed <hamzah.syed17@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111.1"
+uvicorn = "^0.30.3"
+sqlmodel = "^0.0.21"
+psycopg2-binary = "^2.9.9"
+kafka-python = "^2.0.2"
+pydantic = "^2.8.2"
+aiokafka = "^0.11.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.1"
+behave = "^1.2.6"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

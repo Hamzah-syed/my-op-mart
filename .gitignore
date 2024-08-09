@@ -1,0 +1,22 @@
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+
+# Terraform
+terraform/.terraform/
+
+
+# Ignore virtual environments
+venv/
+.env/
+
+# Ignore all .env files and their variants across all services
+**/.env*
+
+# Ignore Poetry specific files
+poetry.lock
+
+# Ignore other common files like logs or IDE settings
+*.log
+.idea/
+.vscode/
