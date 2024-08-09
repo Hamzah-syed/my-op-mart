@@ -5,11 +5,11 @@ name: CI Pipeline
 on:
   push:
     branches:
-      - master
+      - main
       - develop
   pull_request:
     branches:
-      - master
+      - main
       - develop
 
 jobs:
@@ -29,8 +29,8 @@ jobs:
         sudo chmod +x /usr/local/bin/docker-compose
         docker-compose --version
 
-    - name: Build and start services
-      run: docker-compose up -d --build
+    - name: Run Docker Compose Up Script
+      run: ./scripts/docker-compose-up.sh
 
     - name: Wait for services to be ready
       run: |
@@ -42,6 +42,6 @@ jobs:
     - name: Run tests for user-service
       run: docker-compose exec -T user-service poetry run pytest tests/
 
-    - name: Tear down services
+    - name: Run Docker Compose Down Script
       if: always()
-      run: docker-compose down
+      run: ./scripts/docker-compose-down.sh
