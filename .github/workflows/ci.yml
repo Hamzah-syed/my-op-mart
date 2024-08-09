@@ -29,6 +29,11 @@ jobs:
         sudo chmod +x /usr/local/bin/docker-compose
         docker-compose --version
 
+    - name: Set execute permissions for Docker Compose scripts
+      run: |
+        chmod +x ./scripts/docker-compose-up.sh
+        chmod +x ./scripts/docker-compose-down.sh
+
     - name: Run Docker Compose Up Script
       run: ./scripts/docker-compose-up.sh
 
