@@ -81,7 +81,7 @@ services:
       - kafka
       - inventory-db
     env_file:
-      - .env.common
+      - .env.example
       - ./inventory-service/${ENV_FILE}
     volumes:
       - ./inventory-service:/app
@@ -99,7 +99,7 @@ services:
       - kafka
       - user-db
     env_file:
-      - .env.common
+      - .env.example
       - ./user-service/.env
     volumes:
       - ./user-service:/app
@@ -116,7 +116,7 @@ services:
     depends_on:
       - kafka
     env_file:
-      - .env.common
+      - .env.example
       - ./notification-service/.env
     volumes:
       - ./notification-service:/app
