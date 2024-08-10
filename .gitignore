@@ -12,6 +12,7 @@ venv/
 
 # Ignore all .env files and their variants across all services
 **/.env*
+!**/.env.example
 
 # Ignore Poetry specific files
 poetry.lock
