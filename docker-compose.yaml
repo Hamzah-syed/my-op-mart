@@ -100,7 +100,7 @@ services:
       - user-db
     env_file:
       - .env.example
-      - ./user-service/{ENV_FILE}
+      - ./user-service/${ENV_FILE}
     volumes:
       - ./user-service:/app
     networks:
@@ -117,7 +117,7 @@ services:
       - kafka
     env_file:
       - .env.example
-      - ./notification-service//{ENV_FILE}
+      - ./notification-service/${ENV_FILE}
     volumes:
       - ./notification-service:/app
     networks:
