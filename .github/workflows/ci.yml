@@ -40,9 +40,9 @@ jobs:
     - name: Run Docker Compose Up Script
       run: ./scripts/docker-compose-up.sh
 
-    - name: Wait for services to be ready
-      run: |
-        docker-compose exec -T inventory-service bash -c 'until pg_isready -h inventory-db -U postgres; do sleep 1; done'
+    # - name: Wait for services to be ready
+    #   run: |
+    #     docker-compose exec -T inventory-service bash -c 'until pg_isready -h inventory-db -U postgres; do sleep 1; done'
     
     - name: Run tests for inventory-service
       run: docker-compose exec -T inventory-service poetry run pytest tests/
