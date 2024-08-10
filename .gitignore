@@ -15,7 +15,7 @@ venv/
 !**/.env.example
 
 # Ignore Poetry specific files
-poetry.lock
+# poetry.lock
 
 # Ignore other common files like logs or IDE settings
 *.log
