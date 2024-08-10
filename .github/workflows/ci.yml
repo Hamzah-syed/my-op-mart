@@ -5,16 +5,19 @@ name: CI Pipeline
 on:
   push:
     branches:
-      - master
+      - main
       - develop
   pull_request:
     branches:
-      - master
+      - main
       - develop
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    env:
+      ENVIRONMENT: development  # Set this to 'production' or 'development'
 
     steps:
     - name: Checkout code
