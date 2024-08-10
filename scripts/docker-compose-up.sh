@@ -31,4 +31,4 @@
 # fi
  export ENV_FILE=".env.example"
 # Run docker-compose with the selected environment file
-docker-compose up -d --build
+docker-compose --env-file $ENV_FILE up -d --build
