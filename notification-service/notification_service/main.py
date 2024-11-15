@@ -15,6 +15,7 @@ load_dotenv()
 KAFKA_SERVER = os.getenv("KAFKA_BOOTSTRAP_SERVERS")
 KAFKA_SASL_USERNAME = os.getenv("KAFKA_SASL_USERNAME")
 KAFKA_SASL_PASSWORD = os.getenv("KAFKA_SASL_PASSWORD")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 app = FastAPI()
 
@@ -22,17 +23,24 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def create_kafka_topic(topic_name: str):
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
+# Determine the Kafka security protocol
+security_protocol = "PLAINTEXT" if ENVIRONMENT == "development" else "SASL_SSL"
+sasl_mechanism = "PLAIN" if ENVIRONMENT != "development" else None
+sasl_plain_username = KAFKA_SASL_USERNAME if ENVIRONMENT != "development" else None
+sasl_plain_password = KAFKA_SASL_PASSWORD if ENVIRONMENT != "development" else None
+ssl_context = ssl_context if ENVIRONMENT != "development" else None
+
+async def create_kafka_topic(topic_name: str):
     admin_client = KafkaAdminClient(
         bootstrap_servers=KAFKA_SERVER,
-        security_protocol="SASL_SSL",
-        sasl_mechanism="PLAIN",
-        sasl_plain_username=KAFKA_SASL_USERNAME,
-        sasl_plain_password=KAFKA_SASL_PASSWORD,
+        security_protocol=security_protocol,
+        sasl_mechanism=sasl_mechanism,
+        sasl_plain_username=sasl_plain_username,
+        sasl_plain_password=sasl_plain_password,
         ssl_context=ssl_context,
     )
 
@@ -57,29 +65,24 @@ async def on_startup():
     await create_kafka_topic("user_topic")
     await create_kafka_topic("notification_topic")
 
-    # Create SSL context
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-
     app.state.consumer = AIOKafkaConsumer(
         'user_topic',
         loop=loop,
         bootstrap_servers=KAFKA_SERVER,
-        security_protocol="SASL_SSL",
-        sasl_mechanism="PLAIN",
-        sasl_plain_username=KAFKA_SASL_USERNAME,
-        sasl_plain_password=KAFKA_SASL_PASSWORD,
+        security_protocol=security_protocol,
+        sasl_mechanism=sasl_mechanism,
+        sasl_plain_username=sasl_plain_username,
+        sasl_plain_password=sasl_plain_password,
         ssl_context=ssl_context,
         group_id='notification-group'
     )
     app.state.producer = AIOKafkaProducer(
         loop=loop,
         bootstrap_servers=KAFKA_SERVER,
-        security_protocol="SASL_SSL",
-        sasl_mechanism="PLAIN",
-        sasl_plain_username=KAFKA_SASL_USERNAME,
-        sasl_plain_password=KAFKA_SASL_PASSWORD,
+        security_protocol=security_protocol,
+        sasl_mechanism=sasl_mechanism,
+        sasl_plain_username=sasl_plain_username,
+        sasl_plain_password=sasl_plain_password,
         ssl_context=ssl_context,
     )
 

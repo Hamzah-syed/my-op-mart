@@ -1,4 +1,129 @@
+version: '3.9'
+
+x-kong-config:
+  &kong-env
+  KONG_DATABASE: ${KONG_DATABASE:-postgres}
+  KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+  KONG_PG_HOST: db
+  KONG_PG_USER: ${KONG_PG_USER:-kong}
+  KONG_PG_PASSWORD_FILE: /run/secrets/kong_postgres_password
+
+volumes:
+  kong_data: {}
+  kong_prefix_vol:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+  kong_tmp_vol:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+  kafka_data: {}
+  inventory_data: {}
+  user_data: {}
+  product_data: {}
+  order_data: {}
+  payment_data: {}
+
+
+
+
 services:
+  kong-migrations:
+    image: "${KONG_DOCKER_TAG:-kong:latest}"
+    command: kong migrations bootstrap
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    secrets:
+      - kong_postgres_password
+    restart: on-failure
+
+  kong-migrations-up:
+    image: "${KONG_DOCKER_TAG:-kong:latest}"
+    command: kong migrations up && kong migrations finish
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    secrets:
+      - kong_postgres_password
+    restart: on-failure
+
+  kong:
+    image: "${KONG_DOCKER_TAG:-kong:latest}"
+    user: "${KONG_USER:-kong}"
+    environment:
+      <<: *kong-env
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PROXY_LISTEN: "${KONG_PROXY_LISTEN:-0.0.0.0:8000}"
+      KONG_ADMIN_LISTEN: "${KONG_ADMIN_LISTEN:-0.0.0.0:8001}"
+      KONG_ADMIN_GUI_LISTEN: "${KONG_ADMIN_GUI_LISTEN:-0.0.0.0:8002}"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PREFIX: ${KONG_PREFIX:-/var/run/kong}
+      KONG_DECLARATIVE_CONFIG: "/opt/kong/kong.yaml"
+    secrets:
+      - kong_postgres_password
+    ports:
+      # The following two environment variables default to an insecure value (0.0.0.0)
+      # according to the CIS Security test.
+      - "${KONG_INBOUND_PROXY_LISTEN:-0.0.0.0}:8010:8000/tcp" # never set port greater than 8009
+      - "${KONG_INBOUND_SSL_PROXY_LISTEN:-0.0.0.0}:8443:8443/tcp"
+      # Making them mandatory but undefined, like so would be backwards-breaking:
+      # - "${KONG_INBOUND_PROXY_LISTEN?Missing inbound proxy host}:8000:8000/tcp"
+      # - "${KONG_INBOUND_SSL_PROXY_LISTEN?Missing inbound proxy ssl host}:8443:8443/tcp"
+      # Alternative is deactivating check 5.13 in the security bench, if we consider Kong's own config to be enough security here
+
+      - "127.0.0.1:8001:8001/tcp"
+      - "127.0.0.1:8444:8444/tcp"
+      - "127.0.0.1:8012:8002/tcp"
+    healthcheck:
+      test: [ "CMD", "kong", "health" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: on-failure:5
+    read_only: true
+    volumes:
+      - kong_prefix_vol:${KONG_PREFIX:-/var/run/kong}
+      - kong_tmp_vol:/tmp
+      # - ./config:/opt/kong
+    security_opt:
+      - no-new-privileges
+
+  db:
+    image: postgres:9.5
+    environment:
+      POSTGRES_DB: ${KONG_PG_DATABASE:-kong}
+      POSTGRES_USER: ${KONG_PG_USER:-kong}
+      POSTGRES_PASSWORD_FILE: /run/secrets/kong_postgres_password
+    secrets:
+      - kong_postgres_password
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-d",
+          "${KONG_PG_DATABASE:-kong}",
+          "-U",
+          "${KONG_PG_USER:-kong}"
+        ]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+
+  #######################################
+  # Kafka
+  #######################################
   kafka:
     image: bitnami/kafka:latest
     environment:
@@ -18,6 +143,11 @@ services:
       - kafka_data:/bitnami/kafka/data
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -31,6 +161,9 @@ services:
     networks:
       - app-network
 
+  #######################################
+  # Inventory Database
+  #######################################
   inventory-db:
     image: postgres:13
     environment:
@@ -49,6 +182,9 @@ services:
       timeout: 5s
       retries: 5
 
+  #######################################
+  # User Database
+  #######################################
   user-db:
     image: postgres:13
     container_name: user-db
@@ -57,7 +193,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: users
     ports:
-      - "5433:5432"
+      - "5435:5432"
     volumes:
       - user_data:/var/lib/postgresql/data
     networks:
@@ -67,9 +203,74 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  #######################################
+  # product Database
+  #######################################
+  product-db:
+    image: postgres:13
+    container_name: product-db
+    environment:
+      POSTGRES_product: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: products
+    ports:
+      - "5433:5432"
+    volumes:
+      - product_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  #######################################
+  # Order Database
+  #######################################
+  order-db:
+    image: postgres:13
+    container_name: order-db
+    environment:
+      POSTGRES_order: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: orders
+    ports:
+      - "5437:5432"
+    volumes:
+      - order_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  #######################################
+  # Payment Database
+  #######################################
+  payment-db:
+    image: postgres:13
+    container_name: payment-db
+    environment:
+      POSTGRES_payment: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: payments
+    ports:
+      - "5436:5432"
+    volumes:
+      - payment_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  #######################################
+  # Inventory Service
+  #######################################
   inventory-service:
-    # image: hamzahrpc/inventory-service:latest
     container_name: inventory-service
     build:
       context: ./inventory-service
@@ -80,52 +281,116 @@ services:
       - inventory-db
     env_file:
       - .env.example
-      - ./inventory-service/${ENV_FILE}
+      - ./inventory-service/.env.dev
     volumes:
       - ./inventory-service:/app
     networks:
       - app-network
 
+  #######################################
+  # User Service
+  #######################################
   user-service:
-    # image: hamzahrpc/user-service:latest
     container_name: user-service
     build:
       context: ./user-service
     ports:
-      - "8001:8000"
+      - "8002:8000"
     depends_on:
       - kafka
+      - kafka-ui
       - user-db
     env_file:
       - .env.example
-      - ./user-service/${ENV_FILE}
+      - ./user-service/.env.dev
     volumes:
       - ./user-service:/app
     networks:
       - app-network
 
+  #######################################
+  # Product Service
+  #######################################
+  product-service:
+    container_name: product-service
+    build:
+      context: ./product-service
+    ports:
+      - "8004:8000"
+    depends_on:
+      - kafka
+      - product-db
+    env_file:
+      - .env.example
+      - ./product-service/.env.dev
+    volumes:
+      - ./product-service:/app
+    networks:
+      - app-network
+  #######################################
+  # Order Service
+  #######################################
+  order-service:
+    container_name: order-service
+    build:
+      context: ./order-service
+    ports:
+      - "8005:8000"
+    depends_on:
+      - kafka
+      - order-db
+    env_file:
+      - .env.example
+      - ./order-service/.env.dev
+    volumes:
+      - ./order-service:/app
+    networks:
+      - app-network
+  #######################################
+  # Payment Service
+  #######################################
+  payment-service:
+    container_name: payment-service
+    build:
+      context: ./payment-service
+    ports:
+      - "8006:8000"
+    depends_on:
+      - kafka
+      - payment-db
+    env_file:
+      - .env.example
+      - ./payment-service/.env.dev
+    volumes:
+      - ./payment-service:/app
+    networks:
+      - app-network
+
+  #######################################
+  # Notification Service
+  #######################################
   notification-service:
-    # image: hamzahrpc/notification-service:latest
     container_name: notification-service
     build:
       context: ./notification-service
     ports:
-      - "8002:8000"
+      - "8003:8000"
     depends_on:
       - kafka
     env_file:
       - .env.example
-      - ./notification-service/${ENV_FILE}
+      - ./notification-service/.env.dev
     volumes:
       - ./notification-service:/app
     networks:
       - app-network
 
-volumes:
-  kafka_data:
-  inventory_data:
-  user_data:
-
 networks:
   app-network:
     driver: bridge
+  default:
+    driver: bridge
+
+secrets:
+  kong_postgres_password:
+    file: ./POSTGRES_PASSWORD

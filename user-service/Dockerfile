@@ -35,5 +35,3 @@ ENV PYTHONUNBUFFERED=1
 
 # Command to run the application
 CMD ["sh", "-c", "poetry run uvicorn user_service.main:app --host 0.0.0.0 --reload --port 8000"]
-
-# CMD ["poetry", "run", "uvicorn", "user_service.main:app", "--host", "0.0.0.0", "--reload"]

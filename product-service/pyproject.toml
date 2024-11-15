@@ -6,7 +6,15 @@ authors = ["hamzah-syed <hamzah.syed17@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
+fastapi = "^0.112.0"
+uvicorn = "^0.30.5"
+sqlmodel = "^0.0.21"
+kafka-python = "^2.0.2"
+pydantic = "^2.8.2"
+aiokafka = "^0.11.0"
+python-dotenv = "^1.0.1"
+psycopg2 = "^2.9.9"
 
 
 [build-system]
